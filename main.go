@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/aws/aws-sdk-go/service/ssm"
+	"github.com/jedib0t/go-pretty/table"
 	"os"
 )
 
@@ -25,30 +26,39 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("EKS AMI Release latestVersion: %s\n\n", latestVersion)
 
 	awsConfig := aws.NewConfig()
 	svc := eks.New(newSession, awsConfig)
 
-	listClustersInput := &eks.ListClustersInput{}
-	listClusters, err := svc.ListClusters(listClustersInput)
+	clusterList, err := listClusters(svc)
 	eksErr(err)
-	for _, c := range listClusters.Clusters {
+	t := tableInit()
+	for _, c := range clusterList {
 		nodeGroupName, err := getNodegroupName(svc, *c)
 		eksErr(err)
-
-		fmt.Println("Cluster Name:", *c)
 		for _, n := range nodeGroupName {
 			nodegroupVersion, err := getNodegroupVersion(svc, *c, *n)
 			eksErr(err)
-
-			if nodegroupVersion >= latestVersion  {
-				fmt.Println("nodeGroup:", *n , "is using the latest version", nodegroupVersion)
-			} else {
-				fmt.Println("nodeGroup:", *n, "is not using the latest version, currentVersion:", nodegroupVersion)
-			}
+			t.AppendRow(table.Row{ *c, *n, nodegroupVersion, latestVersion})
 		}
 	}
+	fmt.Println(t.Render())
+}
+
+func listClusters(svc *eks.EKS)  ([]*string, error ) {
+	listClustersInput := &eks.ListClustersInput{}
+	listClusters, err := svc.ListClusters(listClustersInput)
+	if err != nil {
+		return  nil, err
+	}
+	return listClusters.Clusters, nil
+}
+
+func tableInit() table.Writer {
+	t := table.NewWriter()
+	t.SetAutoIndex(true)
+	t.AppendHeader(table.Row{"Cluster Name", "Nodegroup Name", "Current Release Version", "Latest Release Version" })
+	return t
 }
 
 func flags() string {
