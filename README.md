@@ -1,6 +1,14 @@
 # Varus
 Simple cli helper tool written in go to get latest AWS EKS AMI release version and compare it with your kubernetes cluster release version
 
+### Install
+```
+wget https://github.com/bhegazy/varus/releases/download/0.0.1/varus-darwin-amd64
+chmod +x varus-darwin-amd64
+mv /usr/local/bin/varus
+```
+
+
 ### Example Usage
 
 ```
