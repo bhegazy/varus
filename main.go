@@ -31,9 +31,15 @@ func main() {
 	}
 	switch os.Args[1] {
 	case "get":
-		getCommand.Parse(os.Args[2:])
+		err := getCommand.Parse(os.Args[2:])
+		if err != nil {
+			panic(err)
+		}
 	case "compare":
-		compareCommand.Parse(os.Args[2:])
+		err := compareCommand.Parse(os.Args[2:])
+		if err != nil {
+			panic(err)
+		}
 	default:
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -71,7 +77,11 @@ func main() {
 			for _, n := range nodeGroupName {
 				nodegroupVersion, err := getNodegroupVersion(svc, *c, *n)
 				awsErr(err)
-				t.AppendRow(table.Row{ *c, *n, nodegroupVersion, latestVersion})
+				if nodegroupVersion >= latestVersion {
+					t.AppendRow(table.Row{ *c, *n, nodegroupVersion, latestVersion, "Yes 🥰"})
+				} else {
+					t.AppendRow(table.Row{ *c, *n, nodegroupVersion, latestVersion, "No ⚔️"})
+				}
 			}
 		}
 		if len(clusterList) == 0 {
@@ -85,7 +95,7 @@ func main() {
 func tableInit() table.Writer {
 	t := table.NewWriter()
 	t.SetAutoIndex(true)
-	t.AppendHeader(table.Row{"Cluster Name", "Nodegroup Name", "Current Release Version", "Latest Release Version" })
+	t.AppendHeader(table.Row{"Cluster Name", "Nodegroup Name", "Current Release Version", "Latest Release Version", "Using Latest?" })
 	return t
 }
 
