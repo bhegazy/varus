@@ -4,11 +4,13 @@ Simple cli helper tool written in go to get latest AWS EKS AMI release version a
 ### Example Usage
 
 ```bash
-export AWS_ACCESS_KEY_ID=xxxxxxx
+> export AWS_ACCESS_KEY_ID=xxxxxxx
 export AWS_SECRET_ACCESS_KEY=xxx
 export AWS_REGION=xxxx
-varus get -k 1.18 # Get the latest EKS AMI Release Version
+
+> varus get -k 1.18 # Get the latest EKS AMI Release Version
 Latest EKS ami release version: 1.18.9-20210208 # Output
+
 ❯ varus compare -k 1.18
 +---+--------------------+-----------------------+-------------------------+------------------------+---------------+
 |   | CLUSTER NAME       | NODEGROUP NAME        | CURRENT RELEASE VERSION | LATEST RELEASE VERSION | USING LATEST? |
@@ -21,7 +23,7 @@ Latest EKS ami release version: 1.18.9-20210208 # Output
 > This is useful when u have multiple aws accounts
 
 ```bash
-aws-vault exec <ur-aws-account-profile> -- varus compare -k 1.18
+> aws-vault exec <ur-aws-account-profile> -- varus compare -k 1.18
 +---+---------------+----------------------+-------------------------+------------------------+---------------+
 |   | CLUSTER NAME  | NODEGROUP NAME       | CURRENT RELEASE VERSION | LATEST RELEASE VERSION | USING LATEST? |
 +---+---------------+----------------------+-------------------------+------------------------+---------------+
