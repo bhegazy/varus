@@ -11,47 +11,75 @@ import (
 	"github.com/jedib0t/go-pretty/table"
 	"os"
 )
-
-func newSession() *session.Session {
-	s:= session.Must(session.NewSession())
-	return s
-}
+var (
+	errCodeInvalidK8sVersion = "Invalid k8s version provided..."
+)
 
 func main() {
-	k8sVersion := flags()
-	releaseParamName := "/aws/service/eks/optimized-ami/" + k8sVersion + "/amazon-linux-2-arm64/recommended/release_version"
 	newSession := newSession()
-
-	latestVersion, err := getLatestVersion(newSession, releaseParamName)
-	if err != nil {
-		panic(err)
-	}
-
 	awsConfig := aws.NewConfig()
-	svc := eks.New(newSession, awsConfig)
 
-	clusterList, err := listClusters(svc)
-	eksErr(err)
-	t := tableInit()
-	for _, c := range clusterList {
-		nodeGroupName, err := getNodegroupName(svc, *c)
-		eksErr(err)
-		for _, n := range nodeGroupName {
-			nodegroupVersion, err := getNodegroupVersion(svc, *c, *n)
-			eksErr(err)
-			t.AppendRow(table.Row{ *c, *n, nodegroupVersion, latestVersion})
+	getCommand := flag.NewFlagSet("get", flag.ExitOnError)
+	getK8sVersion := getCommand.String("k", "", "AWS EKS kubernetes version (Required)")
+
+	compareCommand := flag.NewFlagSet("compare", flag.ExitOnError)
+	compareK8sVersion := compareCommand.String("k", "", "AWS EKS kubernetes version (Required)")
+
+	if len(os.Args) < 2 {
+		fmt.Println("get or compare subcommand is required")
+		os.Exit(1)
+	}
+	switch os.Args[1] {
+	case "get":
+		getCommand.Parse(os.Args[2:])
+	case "compare":
+		compareCommand.Parse(os.Args[2:])
+	default:
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+	if getCommand.Parsed() {
+		// Required Flags
+		if *getK8sVersion == "" {
+			getCommand.PrintDefaults()
+			os.Exit(1)
+		}
+		latestVersion, err := getLatestVersion(newSession, releaseParam(*getK8sVersion))
+		if err != nil {
+			awsErr(err)
+		} else {
+			fmt.Printf("Latest EKS ami release version: %s\n",
+				latestVersion,
+			)
 		}
 	}
-	fmt.Println(t.Render())
-}
-
-func listClusters(svc *eks.EKS)  ([]*string, error ) {
-	listClustersInput := &eks.ListClustersInput{}
-	listClusters, err := svc.ListClusters(listClustersInput)
-	if err != nil {
-		return  nil, err
+	if compareCommand.Parsed() {
+		// Required Flags
+		if *compareK8sVersion == "" {
+			compareCommand.PrintDefaults()
+			os.Exit(1)
+		}
+		latestVersion, err := getLatestVersion(newSession, releaseParam(*compareK8sVersion))
+		awsErr(err)
+		svc := eks.New(newSession, awsConfig)
+		clusterList, err := listClusters(svc)
+		awsErr(err)
+		t := tableInit()
+		for _, c := range clusterList {
+			nodeGroupName, err := getNodegroupName(svc, *c)
+			awsErr(err)
+			for _, n := range nodeGroupName {
+				nodegroupVersion, err := getNodegroupVersion(svc, *c, *n)
+				awsErr(err)
+				t.AppendRow(table.Row{ *c, *n, nodegroupVersion, latestVersion})
+			}
+		}
+		if len(clusterList) == 0 {
+			fmt.Println("No EKS clusters found in this AWS account or region...")
+		} else {
+			fmt.Println(t.Render())
+		}
 	}
-	return listClusters.Clusters, nil
 }
 
 func tableInit() table.Writer {
@@ -61,55 +89,22 @@ func tableInit() table.Writer {
 	return t
 }
 
-func flags() string {
-	// Command args: check-latest, compare
-	// check-latest will check for latest ami release version
-	// compare will compare all current eks clusters/nodegroup with latest release version
-	// both commands will require flag --k8s-version
-	checkCommand := flag.NewFlagSet("check-latest", flag.ExitOnError)
-	compareCommand := flag.NewFlagSet("compare", flag.ExitOnError)
+func newSession() *session.Session {
+	s := session.Must(session.NewSession())
+	return s
+}
 
-	checkK8sVersion := checkCommand.String("k8s-version", "", "AWS EKS kubernetes version (Required)")
-	compareK8sVersion := compareCommand.String("k8s-version", "", "AWS EKS kubernetes version (Required)")
+func listClusters(svc *eks.EKS)  ([]*string, error) {
+	listClustersInput := &eks.ListClustersInput{}
+	listClusters, err := svc.ListClusters(listClustersInput)
+	if err != nil {
+		return nil, err
+	}
+	return listClusters.Clusters, nil
+}
 
-	if len(os.Args) < 2 {
-		fmt.Println("check-latest or compare subcommand is required")
-		os.Exit(1)
-	}
-	switch os.Args[1] {
-	case "check-latest":
-		checkCommand.Parse(os.Args[2:])
-	case "compare":
-		compareCommand.Parse(os.Args[2:])
-	default:
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-	if checkCommand.Parsed() {
-		// Required Flags
-		if *checkK8sVersion == "" {
-			checkCommand.PrintDefaults()
-			os.Exit(1)
-		}
-		// Print
-		fmt.Printf("checkK8sVersion: %s\n",
-			*checkK8sVersion,
-		)
-		return *checkK8sVersion
-	}
-	if compareCommand.Parsed() {
-		// Required Flags
-		if *compareK8sVersion == "" {
-			compareCommand.PrintDefaults()
-			os.Exit(1)
-		}
-		// Print
-		fmt.Printf("compareK8sVersion: %s\n",
-			*compareK8sVersion,
-		)
-		return *compareK8sVersion
-	}
-	return ""
+func releaseParam(v string) string {
+	return "/aws/service/eks/optimized-ami/" + v + "/amazon-linux-2-arm64/recommended/release_version"
 }
 
 func getLatestVersion(session *session.Session, name string) (string, error) {
@@ -148,10 +143,12 @@ func getNodegroupVersion(svc *eks.EKS, c, ng string) (string, error ){
 	return *describeNodeGroup.Nodegroup.ReleaseVersion, nil
 }
 
-func eksErr(err error) {
+func awsErr(err error) {
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
+			case ssm.ErrCodeParameterNotFound:
+				fmt.Println(errCodeInvalidK8sVersion, aerr.Error())
 			case eks.ErrCodeResourceNotFoundException:
 				fmt.Println(eks.ErrCodeResourceNotFoundException, aerr.Error())
 			case eks.ErrCodeClientException:
