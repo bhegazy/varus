@@ -31,6 +31,7 @@ Latest EKS ami release version: 1.18.9-20210208 # Output
 > This is useful when u have multiple aws accounts
 
 ```
+> export AWS_REGION=ap-southeast-1 #make sure you export aws region or have it in `~/.aws/config`
 > aws-vault exec <ur-aws-account-profile> -- varus compare -k 1.18
 +---+---------------+----------------------+-------------------------+------------------------+---------------+
 |   | CLUSTER NAME  | NODEGROUP NAME       | CURRENT RELEASE VERSION | LATEST RELEASE VERSION | USING LATEST? |
