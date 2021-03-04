@@ -5,7 +5,7 @@ Simple cli helper tool written in go to get latest AWS EKS AMI release version a
 ```
 wget https://github.com/bhegazy/varus/releases/download/0.0.1/varus-darwin-amd64
 chmod +x varus-darwin-amd64
-mv /usr/local/bin/varus
+mv varus-darwin-amd64 /usr/local/bin/varus
 ```
 
 
